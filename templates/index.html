@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Laptop Price Predictor</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <main class="card">
+    <header>
+      <h1>Laptop Price Predictor</h1>
+      <p class="subtitle">Pick the specs and a Random Forest model estimates the market price.</p>
+    </header>
+
+    <form id="predict-form" novalidate>
+      <div class="grid">
+        <label>Brand
+          <select name="brand" required>
+            {% for v in options.brand %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+          </select>
+        </label>
+
+        <label>Processor
+          <select name="processor" required>
+            {% for v in options.processor %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+          </select>
+        </label>
+
+        <label>RAM (GB)
+          <select name="ram_gb" required>
+            {% for v in options.ram_gb %}<option value="{{ v }}" {{ 'selected' if v == 16 }}>{{ v }}</option>{% endfor %}
+          </select>
+        </label>
+
+        <label>Storage type
+          <select name="storage_type" required>
+            {% for v in options.storage_type %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+          </select>
+        </label>
+
+        <label>Storage (GB)
+          <select name="storage_gb" required>
+            {% for v in options.storage_gb %}<option value="{{ v }}" {{ 'selected' if v == 512 }}>{{ v }}</option>{% endfor %}
+          </select>
+        </label>
+
+        <label>Graphics card
+          <select name="gpu" required>
+            {% for v in options.gpu %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+          </select>
+        </label>
+
+        <label>Screen size (inches)
+          <select name="screen_size" required>
+            {% for v in options.screen_size %}<option value="{{ v }}" {{ 'selected' if v == 15.6 }}>{{ v }}</option>{% endfor %}
+          </select>
+        </label>
+
+        <label>Weight (kg)
+          <input type="number" name="weight_kg" min="0.5" max="5" step="0.05" value="1.8" required>
+        </label>
+
+        <label>Operating system
+          <select name="os" required>
+            {% for v in options.os %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+          </select>
+        </label>
+
+        <label class="checkbox">
+          <input type="checkbox" name="touchscreen" value="1">
+          Touchscreen
+        </label>
+      </div>
+
+      <button type="submit" id="submit-btn">Predict price</button>
+    </form>
+
+    <section id="result" class="result" hidden aria-live="polite">
+      <p class="result-label">Estimated price</p>
+      <p class="result-price" id="result-price"></p>
+      <p class="result-range" id="result-range"></p>
+    </section>
+
+    <p id="error" class="error" role="alert" hidden></p>
+    <footer>Prices are in Indian Rupees. Trained on a synthetic dataset, so treat results as demo estimates.</footer>
+  </main>
+
+  <script>
+const form = document.getElementById("predict-form");
+const button = document.getElementById("submit-btn");
+const resultBox = document.getElementById("result");
+const priceEl = document.getElementById("result-price");
+const rangeEl = document.getElementById("result-range");
+const errorEl = document.getElementById("error");
+
+const inr = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  maximumFractionDigits: 0,
+});
+
+function showError(message) {
+  errorEl.textContent = message;
+  errorEl.hidden = false;
+  resultBox.hidden = true;
+}
+
+form.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  errorEl.hidden = true;
+
+  const data = new FormData(form);
+  const payload = Object.fromEntries(data.entries());
+  payload.touchscreen = form.elements.touchscreen.checked ? 1 : 0;
+
+  button.disabled = true;
+  button.textContent = "Predicting...";
+
+  try {
+    const response = await fetch("/predict", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const body = await response.json();
+
+    if (!response.ok) {
+      showError(body.error || "Something went wrong. Please try again.");
+      return;
+    }
+
+    priceEl.textContent = inr.format(body.price);
+    rangeEl.textContent = `Likely range: ${inr.format(body.low)} to ${inr.format(body.high)}`;
+    resultBox.hidden = false;
+  } catch (err) {
+    showError("Could not reach the server. Check your connection and try again.");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Predict price";
+  }
+});
+</script>
+</body>
+</html>
